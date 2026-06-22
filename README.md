@@ -3,8 +3,28 @@
 **The brain for your project.**
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![CI](https://github.com/uditrout1/loopforge/actions/workflows/ci.yml/badge.svg)](https://github.com/uditrout1/loopforge/actions/workflows/ci.yml)
 
-LoopForge is a **Product Engineering Intelligence** platform — AI that understands your codebase, your specs, your decisions, and now your designs, all in one place. It is not a coding assistant. It is the persistent brain your entire product engineering team thinks through.
+LoopForge is a **Product Engineering Intelligence** platform. It is not a coding assistant. It is the persistent brain your entire product engineering team thinks through — connecting business intent, architecture decisions, implementation, and quality outcomes into a single living graph.
+
+---
+
+## Platform Intelligence Stack
+
+```
+Business Intent (PRD)
+        ↓ REQUIRES
+Requirements ──────────────────── VALIDATED_BY ──→ Evaluations
+        ↓ DEFINES                                        ↓ SCORES
+Specifications ── GENERATES ──→ ADRs              Implementation
+        ↓                             ↓ APPROVES
+        └─────────── IMPLEMENTS ──→ Code / Files
+                                        ↓ INCLUDED_IN
+                                   Pull Requests ── TAGGED_IN ──→ Releases
+
+All entities connected through the Product Engineering Knowledge Graph.
+LoopForge becomes your system of record for knowledge, decisions, and judgment.
+```
 
 ---
 
@@ -19,49 +39,59 @@ LoopForge is a **Product Engineering Intelligence** platform — AI that underst
 | A script runner | A multi-agent workflow engine |
 | A documentation generator | A spec-driven development system with approval gates |
 | A design viewer | A visual context engine that links designs to code |
+| A search index | A traversable knowledge graph with lineage and impact analysis |
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                   LoopForge Gateway                       │
-│                    (Hono · :18790)                        │
-├──────────┬──────────┬──────────┬──────────┬──────────────┤
-│ Projects │ Sessions │ Backlog  │ Workflows│ Specs / ADRs │
-│  + Packs │ + Vision │ + GitHub │ + Decomp │  + Approval  │
-└────┬─────┴────┬─────┴────┬─────┴────┬─────┴──────┬───────┘
-     │          │          │          │             │
-     ▼          ▼          ▼          ▼             ▼
-  @devos/   @devos/   @devos/   @devos/        @devos/
-   brain    router    backlog  workflows       spec/adr
-     │          │          │
-     │          │          └── @devos/vision
-     ├──────────┤
-     ▼          ▼
-  Supabase   OpenRouter
- (pgvector)  + Ollama
+┌───────────────────────────────────────────────────────────────────┐
+│                        LoopForge Gateway                           │
+│                         (Hono · :18790)                            │
+├──────────┬──────────┬──────────┬──────────┬──────────┬────────────┤
+│ Projects │ Sessions │ Backlog  │Workflows │Specs/ADR │   Graph    │
+│  +Packs  │ +Vision  │ +GitHub  │ +Decomp  │+Approval │  Explorer  │
+└────┬─────┴────┬─────┴────┬─────┴────┬─────┴────┬─────┴─────┬──────┘
+     │          │          │          │          │           │
+     ▼          ▼          ▼          ▼          ▼           ▼
+ @lf/brain  @lf/router @lf/backlog @lf/wf  @lf/spec    @lf/graph
+                                           @lf/adr
+                                           @lf/vision
+                                               │
+                                  All write to ↓
+                          ┌──────────────────────────┐
+                          │   Knowledge Graph         │
+                          │   (graph_nodes +          │
+                          │    graph_edges)           │
+                          └───────────┬──────────────┘
+                                      ↓
+                               Supabase + pgvector
 ```
 
 ### Packages
 
 | Package | Responsibility |
 |---|---|
-| `@devos/core` | Shared TypeScript types — no implementations, no runtime deps |
-| `@devos/brain` | Repo indexer, chunker, context loader, built-in context packs |
-| `@devos/router` | Model routing: OpenRouter (cloud) + Ollama (on-prem), complexity tiers, data classification |
-| `@devos/skills` | 8 built-in skills, keyword recommender, capability gap advisor |
-| `@devos/workflows` | Multi-agent workflow engine, 4 built-in workflows, epic decomposer |
-| `@devos/backlog` | GitHub Issues integration, ticket classification, AI prioritization |
-| `@devos/adr` | Architecture Decision Record extraction and storage |
-| `@devos/spec` | PRD, architecture doc, and technical spec generation with approval workflows |
-| `@devos/vision` | Visual Context Engine — screenshots, Figma, wireframes linked to code |
-| `@devos/db` | Supabase persistence adapter (pgvector for embeddings) |
-| `@devos/gateway` | Hono HTTP gateway (port 18790), all routes, auth middleware |
-| `apps/ui` | Next.js 15 developer UI — chat, skill browser, pack selector, cost dashboard, visual analysis |
+| `@loopforge/core` | Shared TypeScript types — no implementations, no runtime deps |
+| `@loopforge/brain` | Repo indexer, chunker, context loader, built-in context packs |
+| `@loopforge/router` | Model routing: OpenRouter (cloud) + Ollama (on-prem), complexity tiers, data classification |
+| `@loopforge/skills` | 8 built-in skills, keyword recommender, capability gap advisor |
+| `@loopforge/workflows` | Multi-agent workflow engine, 4 built-in workflows, epic decomposer |
+| `@loopforge/backlog` | GitHub Issues integration, ticket classification, AI prioritization |
+| `@loopforge/adr` | Architecture Decision Record extraction and storage |
+| `@loopforge/spec` | PRD, architecture doc, and technical spec generation with approval workflows |
+| `@loopforge/vision` | Visual Context Engine — screenshots, Figma, wireframes linked to code |
+| `@loopforge/graph` | Product Engineering Knowledge Graph — lineage, impact analysis, traceability |
+| `@loopforge/evals` | Eval Engine — converts requirements and standards into executable quality criteria |
+| `@loopforge/db` | Supabase persistence adapter (pgvector for embeddings) |
+| `@loopforge/gateway` | Hono HTTP gateway (port 18790), all routes, auth middleware |
+| `apps/ui` | Next.js 15 developer UI — chat, skill browser, pack selector, graph explorer, cost dashboard |
 
-**Package dependency order:** `core` ← `brain`, `router`, `skills`, `backlog`, `adr`, `spec`, `vision` ← `workflows` ← `gateway`
+**Package dependency order:**
+```
+core ← brain, router, skills, backlog, adr, spec, vision, graph, evals ← workflows ← gateway
+```
 
 ---
 
@@ -71,6 +101,7 @@ LoopForge is a **Product Engineering Intelligence** platform — AI that underst
 - **Spec-Driven Development** — generate PRDs, architecture docs, and technical specs via `POST /specs/:projectId/generate`
 - **Approval workflows** — specs must be approved before downstream tasks are created
 - **ADR extraction** — architectural decisions captured automatically from sessions; exportable as markdown
+- **Eval generation** — approved specs can generate evaluation criteria from requirements automatically
 
 ### Code
 - **Project Brain** — index a repo once; every session starts fully loaded with stack detection, conventions, and TODO surfacing
@@ -80,13 +111,14 @@ LoopForge is a **Product Engineering Intelligence** platform — AI that underst
 
 ### Design
 - **Visual Context Engine** — upload a screenshot or paste a Figma URL; LoopForge analyzes UX issues, accessibility gaps, and copy problems, then links findings directly to source files
-- **Design-to-code linking** — component names detected in visual analysis are matched against indexed code chunks, so you see exactly which files to change
+- **Design-to-code linking** — component names detected in visual analysis are matched against indexed code chunks
 - **Multimodal sessions** — attach images directly to session messages; the frontier model reasons over code and visual context together
 
 ### Review
 - **Multi-Agent Workflows** — PR review, bug investigation, release prep, nightly security scan
 - **Intelligent Model Routing** — complexity-based tier selection: simple tasks → small model (Qwen 7B), code gen → medium, debugging/architecture → frontier
 - **Data Classification Enforcement** — confidential/restricted projects automatically routed to on-prem Ollama; data never leaves your network
+- **Eval Engine** — structured evaluation suites with AI scoring, human feedback capture, and regression detection
 
 ### Release
 - **Epic Decomposer** — `POST /projects/:id/decompose` turns an epic description into sprint-ready tickets with file links pre-populated
@@ -94,6 +126,7 @@ LoopForge is a **Product Engineering Intelligence** platform — AI that underst
 - **GitHub Webhook** — live ticket sync on push/PR events via `POST /backlog/webhook/github`
 
 ### Learn
+- **Product Engineering Knowledge Graph** — traversable graph connecting PRDs, requirements, specs, ADRs, code files, tickets, PRs, evaluations, and visual assets. Answer: "What breaks if this requirement changes?", "Which ADR approved this service?", "What led to this code existing?"
 - **ADR Store** — all architectural decisions queryable and exportable per project
 - **Cost Dashboard** — token usage and cost breakdown by session, project, and model in the UI
 
@@ -103,7 +136,7 @@ LoopForge is a **Product Engineering Intelligence** platform — AI that underst
 
 ```bash
 # 1. Clone
-git clone https://github.com/uditrout1/devos && cd devos && pnpm install
+git clone https://github.com/uditrout1/loopforge && cd loopforge && pnpm install
 
 # 2. Configure
 cp .env.example .env
@@ -118,6 +151,7 @@ pnpm dev
 ### Connect a project
 
 ```bash
+# Connect a repo
 curl -X POST http://localhost:18790/projects \
   -H "Content-Type: application/json" \
   -d '{"name": "my-app", "repoPath": "/path/to/repo"}'
@@ -131,13 +165,18 @@ curl -X POST http://localhost:18790/sessions \
 curl -X POST http://localhost:18790/vision/<projectId>/screenshot \
   -H "Content-Type: application/json" \
   -d '{"name": "checkout flow", "base64": "<base64>", "mediaType": "image/png", "question": "What UX issues do you see?"}'
+
+# Query the knowledge graph
+curl http://localhost:18790/graph/<projectId>/nodes/<nodeId>/downstream
 ```
 
 ---
 
 ## API Reference
 
-All routes require `X-API-Key: <DEVOS_API_KEY>` when `HOST != 127.0.0.1`.
+All routes require `X-API-Key: <LOOPFORGE_API_KEY>` when `HOST != 127.0.0.1`.
+
+### Core
 
 | Method | Route | Description |
 |---|---|---|
@@ -145,14 +184,43 @@ All routes require `X-API-Key: <DEVOS_API_KEY>` when `HOST != 127.0.0.1`.
 | `POST` | `/sessions` | Start a session (optional `packId`) |
 | `POST` | `/sessions/:id/messages` | Send a message → AI response + skill recommendations + capability gaps |
 | `POST` | `/projects/:id/decompose` | Decompose an epic into sprint-ready tickets |
+
+### Specs & ADRs
+
+| Method | Route | Description |
+|---|---|---|
 | `POST` | `/specs/:projectId/generate` | Generate PRD / architecture / technical spec |
 | `POST` | `/specs/:projectId/:id/approve` | Approve a spec |
 | `GET` | `/adrs/:projectId` | List ADRs for a project |
 | `GET` | `/adrs/:projectId/export` | Export all ADRs as markdown |
-| `GET` | `/workflows` | List available workflows |
-| `POST` | `/workflows/:id/runs` | Start a workflow run |
+
+### Knowledge Graph
+
+| Method | Route | Description |
+|---|---|---|
+| `GET` | `/graph/:projectId/summary` | Node and edge counts by type |
+| `GET` | `/graph/:projectId/nodes` | List nodes, filterable by `?type=` |
+| `GET` | `/graph/:projectId/nodes/:nodeId` | Node with all edges |
+| `GET` | `/graph/:projectId/nodes/:nodeId/upstream` | Lineage — what caused this to exist |
+| `GET` | `/graph/:projectId/nodes/:nodeId/downstream` | Impact — what changes if this changes |
+| `GET` | `/graph/:projectId/trace` | Shortest path between `?from=&to=` |
+| `GET` | `/graph/:projectId/search` | Full-text search over node titles |
+| `POST` | `/graph/:projectId/nodes` | Manually create a node |
+| `POST` | `/graph/:projectId/edges` | Manually create an edge |
+
+### Backlog & Workflows
+
+| Method | Route | Description |
+|---|---|---|
 | `GET` | `/backlog/tickets/:projectId` | Prioritized ticket list |
 | `POST` | `/backlog/webhook/github` | GitHub webhook receiver |
+| `GET` | `/workflows` | List available workflows |
+| `POST` | `/workflows/:id/runs` | Start a workflow run |
+
+### Visual Context
+
+| Method | Route | Description |
+|---|---|---|
 | `POST` | `/vision/:projectId/screenshot` | Analyze a screenshot → structured UX + a11y + code feedback |
 | `POST` | `/vision/:projectId/figma` | Analyze a Figma URL |
 | `POST` | `/vision/:projectId/assets/:id/ask` | Follow-up question on an existing visual asset |
@@ -164,22 +232,22 @@ All routes require `X-API-Key: <DEVOS_API_KEY>` when `HOST != 127.0.0.1`.
 
 ```bash
 # Model routing
-OPENROUTER_API_KEY=       # Cloud model access (required for cloud tiers)
-OLLAMA_BASE_URL=          # On-prem model endpoint (default: http://localhost:11434)
+OPENROUTER_API_KEY=         # Cloud model access (required for cloud tiers)
+OLLAMA_BASE_URL=            # On-prem model endpoint (default: http://localhost:11434)
 
 # Gateway
 PORT=18790
-HOST=127.0.0.1            # Set to 0.0.0.0 for remote access (requires DEVOS_API_KEY)
-DEVOS_API_KEY=            # Required when HOST != 127.0.0.1
-ALLOWED_REPO_ROOTS=       # Colon-separated allowed repo paths
-CORS_ORIGINS=             # Comma-separated allowed origins
+HOST=127.0.0.1              # Set to 0.0.0.0 for remote access (requires LOOPFORGE_API_KEY)
+LOOPFORGE_API_KEY=          # Required when HOST != 127.0.0.1
+ALLOWED_REPO_ROOTS=         # Colon-separated allowed repo paths
+CORS_ORIGINS=               # Comma-separated allowed origins
 
 # Persistence
-SUPABASE_URL=             # pgvector-backed persistence (production)
+SUPABASE_URL=               # pgvector-backed persistence (production)
 SUPABASE_SERVICE_ROLE_KEY=
 
 # GitHub integration
-GITHUB_WEBHOOK_SECRET=    # For GitHub webhook verification
+GITHUB_WEBHOOK_SECRET=      # For GitHub webhook verification
 ```
 
 ---
@@ -197,7 +265,7 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 18790
-      DEVOS_API_KEY: ${DEVOS_API_KEY}
+      LOOPFORGE_API_KEY: ${LOOPFORGE_API_KEY}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       OLLAMA_BASE_URL: http://ollama:11434
       SUPABASE_URL: ${SUPABASE_URL}
@@ -238,7 +306,11 @@ For confidential/restricted workloads, omit `OPENROUTER_API_KEY` — all request
 - [x] Spec-driven development (PRD / architecture / technical spec + approval)
 - [x] Supabase persistence + pgvector semantic search
 - [x] Next.js 15 developer UI
-- [x] Visual Context Engine — screenshots, Figma URLs, design-to-code linking, UX/a11y analysis
+- [x] Visual Context Engine (screenshots, Figma, design-to-code linking, UX/a11y analysis)
+
+### In Progress
+- [ ] **Product Engineering Knowledge Graph** — connects requirements, decisions, implementation, and quality outcomes; lineage tracing, impact analysis, traceability queries
+- [ ] **Eval Engine** — converts requirements and standards into machine-executable evaluation criteria; AI scoring, human feedback loop, regression detection
 
 ### Coming
 - [ ] Workflow marketplace — community-contributed workflow definitions
@@ -254,8 +326,8 @@ For confidential/restricted workloads, omit `OPENROUTER_API_KEY` — all request
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, conventions, and how to add skills, workflows, context packs, and spec generators.
 
-Found a bug? [Open an issue](../../issues/new?template=bug_report.md).
-Have a feature idea? [Start a discussion](../../discussions).
+Found a bug? [Open an issue](https://github.com/uditrout1/loopforge/issues/new).
+Have a feature idea? [Start a discussion](https://github.com/uditrout1/loopforge/discussions).
 
 ---
 

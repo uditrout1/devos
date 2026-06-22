@@ -1,6 +1,6 @@
 # Contributing to LoopForge
 
-This document covers development setup, conventions, and how to extend LoopForge with new skills, workflows, context packs, and spec generators.
+This document covers development setup, conventions, and how to extend LoopForge with new skills, workflows, context packs, spec generators, graph ingestion hooks, and eval suites.
 
 ---
 
@@ -14,18 +14,18 @@ This document covers development setup, conventions, and how to extend LoopForge
 ### Clone and install
 
 ```bash
-git clone https://github.com/uditrout1/devos
-cd devos
+git clone https://github.com/uditrout1/loopforge
+cd loopforge
 pnpm install
 ```
 
 ### Build
 
 ```bash
-pnpm build                              # build all packages
-pnpm dev                                # run gateway + UI in watch mode
-pnpm --filter @devos/gateway dev        # gateway only
-pnpm --filter apps/ui dev              # UI only
+pnpm build                                    # build all packages
+pnpm dev                                      # run gateway + UI in watch mode
+pnpm --filter @loopforge/gateway dev          # gateway only
+pnpm --filter apps/ui dev                     # UI only
 ```
 
 ### Environment
@@ -51,15 +51,18 @@ packages/
   backlog/    — GitHub Issues integration, ticket classification, AI prioritization
   adr/        — ADR extraction and storage
   spec/       — PRD/architecture/technical spec generation and approval workflows
+  vision/     — Visual Context Engine: screenshots, Figma, design-to-code linking
+  graph/      — Product Engineering Knowledge Graph: lineage, impact analysis, traceability
+  evals/      — Eval Engine: evaluation definitions, runs, scoring, human feedback
   db/         — Supabase persistence adapter (pgvector for embeddings)
   gateway/    — Hono HTTP gateway (port 18790), all routes, auth middleware
 apps/
-  ui/         — Next.js 15 developer UI (chat, skill browser, pack selector, cost dashboard)
+  ui/         — Next.js 15 developer UI (chat, skill browser, pack selector, graph explorer)
 ```
 
 **Package dependency order:**
 ```
-core ← brain, router, skills, backlog, adr, spec ← workflows ← gateway
+core ← brain, router, skills, backlog, adr, spec, vision, graph, evals ← workflows ← gateway
 ```
 
 ---
@@ -73,13 +76,15 @@ core ← brain, router, skills, backlog, adr, spec ← workflows ← gateway
 - Prefer `node:` protocol for built-in imports (`node:crypto`, `node:fs/promises`)
 - No comments explaining what code does — only why if genuinely non-obvious
 - No unused variables, no dead code
+- Spread-conditional pattern for optional fields: `...(x !== undefined ? { x } : {})`
 
 ### Packages
 
 - Each package has a single responsibility
-- `@devos/core` exports types only — no runtime dependencies
+- `@loopforge/core` exports types only — no runtime dependencies
 - Provider implementations (OpenRouter, Ollama) are swappable behind the same interface
 - New providers go in `packages/router/src/providers/`
+- Graph ingestion side effects go in the calling package — `@loopforge/graph` is called from spec/adr/backlog/vision/brain, not the reverse
 
 ### Git
 
@@ -99,7 +104,7 @@ Skills live in `packages/skills/src/built-in.ts`. A skill requires:
   id: "unique-kebab-id",
   name: "Human Readable Name",
   description: "One sentence — used for similarity search. Be specific.",
-  triggerKeywords: ["keyword1", "keyword2"],   // phrases that activate it
+  triggerKeywords: ["keyword1", "keyword2"],
   promptTemplate: `Your skill's system prompt here.`,
   requiredTools: [],
   requiredModelCapability: "small" | "medium" | "frontier",
@@ -111,7 +116,7 @@ Skills live in `packages/skills/src/built-in.ts`. A skill requires:
 
 After adding: rebuild and verify the skill appears in `GET /skills` and keyword matching works.
 
-Skills that require frontier models should justify the requirement in a comment — the default preference is the lowest tier that produces acceptable output.
+Skills that require frontier models should justify the requirement — the default preference is the lowest tier that produces acceptable output.
 
 ---
 
@@ -120,7 +125,7 @@ Skills that require frontier models should justify the requirement in a comment 
 Workflows live in `packages/workflows/src/built-in/`. Each workflow is a directed agent graph.
 
 1. Create `packages/workflows/src/built-in/<your-workflow>.ts`
-2. Export a `WorkflowDefinition` (type in `@devos/core`):
+2. Export a `WorkflowDefinition` (type in `@loopforge/core`):
 
 ```typescript
 export const myWorkflow: WorkflowDefinition = {
@@ -130,14 +135,11 @@ export const myWorkflow: WorkflowDefinition = {
   steps: [
     {
       id: "step-1",
-      agentRole: "...",           // system prompt for this step's agent
-      inputs: ["$initial"],       // step inputs ($ prefix = workflow input)
+      agentRole: "...",
+      inputs: ["$initial"],
       outputs: ["step1_result"],
       modelTier: "medium",
     },
-    // parallel steps: set runParallel: true on each
-    // conditional branching: use condition field
-    // human checkpoints: set requiresApproval: true
   ],
 }
 ```
@@ -148,7 +150,7 @@ export const myWorkflow: WorkflowDefinition = {
 
 ## Adding a Context Pack
 
-Context packs live in `packages/brain/src/packs/`. A pack is a curated slice of context loaded at session start for a specific task type.
+Context packs live in `packages/brain/src/packs/`. A pack is a curated slice of context loaded at session start.
 
 1. Create `packages/brain/src/packs/<pack-id>.ts`
 2. Export a `ContextPack`:
@@ -159,16 +161,11 @@ export const authPack: ContextPack = {
   name: "Authentication",
   description: "Auth patterns, session handling, token flows.",
   fileGlobs: ["**/auth/**", "**/middleware/auth*", "**/session*"],
-  systemPromptAddition: `
-    Focus on the project's authentication conventions.
-    Note any deviations from standard patterns.
-  `,
+  systemPromptAddition: `Focus on the project's authentication conventions.`,
 }
 ```
 
 3. Register it in `packages/brain/src/packs/index.ts`
-
-Packs are selected at session creation via `packId`. The brain loader uses the pack's `fileGlobs` to prioritize which chunks are loaded into context.
 
 ---
 
@@ -177,27 +174,60 @@ Packs are selected at session creation via `packId`. The brain loader uses the p
 Spec generators live in `packages/spec/src/generators/`. LoopForge ships generators for PRDs, architecture docs, and technical specs.
 
 1. Create `packages/spec/src/generators/<type>.ts`
-2. Implement the `SpecGenerator` interface (type in `@devos/core`):
+2. Implement the generator and register it in `packages/spec/src/generators/index.ts`
+
+Approved specs propagate requirement nodes and edges into the Knowledge Graph automatically.
+
+---
+
+## Adding a Graph Ingestion Hook
+
+When a new entity type is introduced (a new package, a new domain object), add an ingestion function in `packages/graph/src/ingestion.ts`:
 
 ```typescript
-export const mySpecGenerator: SpecGenerator = {
-  type: "my-spec-type",
-  name: "My Spec Type",
-  promptTemplate: `
-    Given the following project context:
-    {{projectContext}}
-
-    Generate a <your spec type> that covers:
-    - ...
-  `,
-  outputSchema: z.object({ ... }),   // Zod schema for structured output
-  requiresApproval: true,            // gate downstream tasks on approval
+export async function ingestMyEntity(
+  entity: MyEntity,
+  store: GraphStore,
+): Promise<void> {
+  const node: GraphNode = {
+    id: `my_entity:${entity.id}`,
+    projectId: entity.projectId,
+    entityType: "my_entity_type",
+    title: entity.name,
+    metadata: { status: entity.status },
+    sourceSystem: "my-package",
+    sourceId: entity.id,
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+  }
+  await store.upsertNode(node)
+  // Add edges for relationships
 }
 ```
 
-3. Register it in `packages/spec/src/generators/index.ts`
+Then call it as a non-blocking side effect in the package that owns the entity:
 
-Approved specs are stored and referenced by the epic decomposer when creating tickets.
+```typescript
+// Non-blocking — graph is a derived projection, not the source of truth
+ingestMyEntity(entity, graphStore).catch(() => {})
+```
+
+---
+
+## Adding an Eval Suite
+
+Eval suites live in `packages/evals/src/built-in-suites.ts`. A suite is a named collection of evaluation criteria applied together:
+
+```typescript
+export const myEvalSuite: EvalSuite = {
+  id: "my-suite",
+  name: "My Review Suite",
+  evaluationIds: ["security-review", "performance-check"],
+  passingThreshold: 0.8,
+}
+```
+
+Register it and add the suite ID to any workflow node that should gate on it.
 
 ---
 
@@ -206,9 +236,9 @@ Approved specs are stored and referenced by the epic decomposer when creating ti
 Providers live in `packages/router/src/providers/`. Each provider must:
 
 1. Accept `messages: Message[]`, a capability tier, and provider-specific config
-2. Return a `ModelResponse` matching the type in `@devos/core`
+2. Return a `ModelResponse` matching the type in `@loopforge/core`
 3. Handle rate limits (429) with exponential backoff internally
-4. Report accurate `inputTokens`, `outputTokens`, and `costUsd`
+4. Serialize `MessageContent` correctly — string for text-only, multipart array for vision
 
 Wire the new provider into `packages/router/src/router.ts`.
 
@@ -228,7 +258,8 @@ For larger changes (new packages, new workflow types, major refactors), open a D
 
 ## Reporting Bugs
 
-Use the [bug report template](../../issues/new?template=bug_report.md). Include:
+Use the [bug report template](https://github.com/uditrout1/loopforge/issues/new). Include:
+
 - What you did
 - What you expected
 - What actually happened
