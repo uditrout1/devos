@@ -25,5 +25,5 @@ export function parseFigmaUrl(url: string): FigmaRef | null {
 }
 
 export function buildFigmaEmbedUrl(ref: FigmaRef): string {
-  return `https://www.figma.com/embed?embed_host=devos&url=${encodeURIComponent(ref.url)}`
+  return `https://www.figma.com/embed?embed_host=loopforge&url=${encodeURIComponent(ref.url)}`
 }

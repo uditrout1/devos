@@ -24,19 +24,19 @@ import type { Project, Ticket, ContextChunk, ContextPack } from "@loopforge/core
 const PORT = Number(process.env["PORT"] ?? 18790)
 
 // Fix 3a: API key auth.
-// Set DEVOS_API_KEY in the environment. All /projects and /sessions routes
+// Set LOOPFORGE_API_KEY in the environment. All /projects and /sessions routes
 // require "Authorization: Bearer <key>" or "X-API-Key: <key>".
 // If no key is set the server refuses to start unless HOST is 127.0.0.1.
-const DEVOS_API_KEY = process.env["DEVOS_API_KEY"]
+const LOOPFORGE_API_KEY = process.env["LOOPFORGE_API_KEY"]
 const HOST = process.env["HOST"] ?? "127.0.0.1"
 
 async function requireApiKey(c: Context, next: Next): Promise<Response | void> {
-  if (!DEVOS_API_KEY) {
+  if (!LOOPFORGE_API_KEY) {
     // No key configured — traffic is allowed only from localhost
     const forwarded = c.req.header("x-forwarded-for")
     if (forwarded) {
       return c.json(
-        { error: "Set DEVOS_API_KEY before exposing LoopForge beyond localhost." },
+        { error: "Set LOOPFORGE_API_KEY before exposing LoopForge beyond localhost." },
         401,
       )
     }
@@ -48,7 +48,7 @@ async function requireApiKey(c: Context, next: Next): Promise<Response | void> {
     ? bearer.slice(7)
     : (c.req.header("x-api-key") ?? "")
 
-  if (!token || token !== DEVOS_API_KEY) {
+  if (!token || token !== LOOPFORGE_API_KEY) {
     return c.json({ error: "Unauthorized" }, 401)
   }
 
@@ -99,9 +99,9 @@ function createInMemoryBrainStore(projectsMap: Map<string, Project>): BrainStore
 }
 
 function main() {
-  if (!DEVOS_API_KEY && HOST !== "127.0.0.1" && HOST !== "localhost") {
+  if (!LOOPFORGE_API_KEY && HOST !== "127.0.0.1" && HOST !== "localhost") {
     console.error(
-      "[security] DEVOS_API_KEY must be set when HOST is not 127.0.0.1. Refusing to start.",
+      "[security] LOOPFORGE_API_KEY must be set when HOST is not 127.0.0.1. Refusing to start.",
     )
     process.exit(1)
   }
@@ -215,7 +215,7 @@ function main() {
 
   serve({ fetch: app.fetch, port: PORT, hostname: HOST }, () => {
     console.log(`LoopForge Gateway listening on ${HOST}:${PORT}`)
-    console.log(`  Auth: ${DEVOS_API_KEY ? "API key required" : "localhost-only (set DEVOS_API_KEY for remote access)"}`)
+    console.log(`  Auth: ${LOOPFORGE_API_KEY ? "API key required" : "localhost-only (set LOOPFORGE_API_KEY for remote access)"}`)
     console.log(`  OpenRouter: ${openRouterKey ? "configured" : "not set"}`)
     console.log(`  Ollama: ${routerConfig.ollamaBaseUrl}`)
   })

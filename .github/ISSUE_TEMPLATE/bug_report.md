@@ -18,7 +18,7 @@ labels: bug
 
 **Environment**
 
-- DevOS version:
+- LoopForge version:
 - Node.js version:
 - OS:
 - Model provider (OpenRouter / Ollama):

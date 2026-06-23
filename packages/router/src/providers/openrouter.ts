@@ -54,7 +54,7 @@ export async function callOpenRouter(
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://devos.app",
+      "HTTP-Referer": "https://loopforge.dev",
       "X-Title": "LoopForge",
     },
     body: JSON.stringify({

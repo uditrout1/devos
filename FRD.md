@@ -325,7 +325,7 @@ LoopForge consists of five functional subsystems that share a common data layer:
 > As a developer, I want tickets to update themselves when I commit code so I don't have to manually update Jira.
 
 **Functional Requirements:**
-- System shall monitor commit messages and PR titles for ticket references (e.g., "fixes #42", "closes DEVOS-17")
+- System shall monitor commit messages and PR titles for ticket references (e.g., "fixes #42", "closes LOOPFORGE-17")
 - System shall update ticket status to "in progress" when a PR referencing the ticket is opened
 - System shall update ticket status to "resolved" when a PR referencing the ticket is merged
 - System shall post an automated comment on the ticket with: PR link, commit SHA, merged by, timestamp

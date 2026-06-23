@@ -39,7 +39,7 @@ export default async function ProjectPage({ params }: PageProps) {
         }}
       >
         <Link href="/" style={{ color: "#555", textDecoration: "none" }}>
-          DevOS
+          LoopForge
         </Link>
         <span>/</span>
         <span style={{ color: "#e8e8e8" }}>{project?.name ?? id}</span>
